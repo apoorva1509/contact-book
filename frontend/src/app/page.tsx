@@ -62,13 +62,16 @@ export default function Home() {
     });
   }, []);
 
-  const handleSave = async (data: ContactCreate | ContactUpdate) => {
+  const handleSave = async (data: ContactCreate | ContactUpdate, pendingAvatar?: File) => {
     try {
       if (editingContact && editingContact !== "new") {
         await api.updateContact(editingContact.id, data as ContactUpdate);
         toast.success("Contact updated");
       } else {
-        await api.createContact(data as ContactCreate);
+        const created = await api.createContact(data as ContactCreate);
+        if (pendingAvatar) {
+          await api.uploadAvatar(created.id, pendingAvatar);
+        }
         toast.success("Contact created");
       }
       setEditingContact(null);

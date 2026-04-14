@@ -5,9 +5,36 @@ import type { Contact, ContactCreate, ContactUpdate } from "@/lib/types";
 
 interface ContactModalProps {
   contact: Contact | null;
-  onSave: (data: ContactCreate | ContactUpdate) => void;
+  onSave: (data: ContactCreate | ContactUpdate, pendingAvatar?: File) => void;
   onAvatarUpload?: (contactId: string, file: File) => void;
   onClose: () => void;
+}
+
+interface FieldErrors {
+  firstName?: string;
+  phones?: Record<number, string>;
+  emails?: Record<number, string>;
+  general?: string;
+}
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const PHONE_REGEX = /^\+?[\d\s\-().]{7,}$/;
+
+function validatePhone(phone: string): string | null {
+  const trimmed = phone.trim();
+  if (!trimmed) return null;
+  if (!PHONE_REGEX.test(trimmed)) return "Invalid phone format (e.g. +1 555 123 4567)";
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 7) return "Phone number too short";
+  if (digits.length > 15) return "Phone number too long";
+  return null;
+}
+
+function validateEmail(email: string): string | null {
+  const trimmed = email.trim();
+  if (!trimmed) return null;
+  if (!EMAIL_REGEX.test(trimmed)) return "Invalid email format";
+  return null;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -18,6 +45,9 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
   const [phones, setPhones] = useState<string[]>(contact?.phone_numbers ?? [""]);
   const [emails, setEmails] = useState<string[]>(contact?.email_addresses ?? [""]);
   const [notes, setNotes] = useState(contact?.notes ?? "");
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -27,16 +57,48 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
     return () => window.removeEventListener("keydown", handleEsc);
   }, [onClose]);
 
+  const validate = (): boolean => {
+    const newErrors: FieldErrors = {};
+
+    if (!firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    }
+
+    const phoneErrors: Record<number, string> = {};
+    phones.forEach((p, i) => {
+      const err = validatePhone(p);
+      if (err) phoneErrors[i] = err;
+    });
+    if (Object.keys(phoneErrors).length > 0) newErrors.phones = phoneErrors;
+
+    const emailErrors: Record<number, string> = {};
+    emails.forEach((e, i) => {
+      const err = validateEmail(e);
+      if (err) emailErrors[i] = err;
+    });
+    if (Object.keys(emailErrors).length > 0) newErrors.emails = emailErrors;
+
+    const hasPhone = phones.some((p) => p.trim());
+    const hasEmail = emails.some((e) => e.trim());
+    if (!hasPhone && !hasEmail) {
+      newErrors.general = "At least one phone number or email is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     const data = {
-      first_name: firstName,
-      last_name: lastName || undefined,
+      first_name: firstName.trim(),
+      last_name: lastName.trim() || undefined,
       phone_numbers: phones.filter((p) => p.trim()),
       email_addresses: emails.filter((em) => em.trim()),
       notes: notes.trim() || undefined,
     };
-    onSave(data);
+    onSave(data, pendingAvatar ?? undefined);
   };
 
   const addField = (setter: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -65,41 +127,46 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
           {contact ? "Edit Contact" : "Add Contact"}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {contact && (
-            <div className="flex items-center gap-4">
-              {contact.avatar_url ? (
-                <img
-                  src={`${API_BASE}${contact.avatar_url}`}
-                  alt="Avatar"
-                  className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-100"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white flex items-center justify-center text-xl font-semibold">
-                  {contact.first_name[0]}{contact.last_name?.[0] ?? ""}
-                </div>
-              )}
-              <label className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
-                Change photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file && onAvatarUpload) onAvatarUpload(contact.id, file);
-                  }}
-                />
-              </label>
-            </div>
+          <div className="flex items-center gap-4">
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="Preview" className="w-16 h-16 rounded-full object-cover ring-2 ring-blue-200" />
+            ) : contact?.avatar_url ? (
+              <img src={`${API_BASE}${contact.avatar_url}`} alt="Avatar" className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-100" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white flex items-center justify-center text-xl font-semibold">
+                {firstName ? firstName[0].toUpperCase() : "?"}{lastName ? lastName[0].toUpperCase() : ""}
+              </div>
+            )}
+            <label className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+              {contact?.avatar_url || avatarPreview ? "Change photo" : "Add photo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (contact) {
+                    if (onAvatarUpload) onAvatarUpload(contact.id, file);
+                  } else {
+                    setPendingAvatar(file);
+                    setAvatarPreview(URL.createObjectURL(file));
+                  }
+                }}
+              />
+            </label>
+          </div>
+          {errors.general && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{errors.general}</div>
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
             <input
-              required
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
+              onChange={(e) => { setFirstName(e.target.value); setErrors((prev) => ({ ...prev, firstName: undefined })); }}
+              className={`w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent ${errors.firstName ? "border-red-400" : "border-gray-200"}`}
             />
+            {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
@@ -112,16 +179,19 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Numbers</label>
             {phones.map((phone, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <input
-                  value={phone}
-                  onChange={(e) => updateField(i, e.target.value, setPhones)}
-                  placeholder="+1 555 123 4567"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
-                />
-                {phones.length > 1 && (
-                  <button type="button" onClick={() => removeField(i, setPhones)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
-                )}
+              <div key={i} className="mb-2">
+                <div className="flex gap-2">
+                  <input
+                    value={phone}
+                    onChange={(e) => { updateField(i, e.target.value, setPhones); setErrors((prev) => { const p = { ...prev.phones }; delete p[i]; return { ...prev, phones: Object.keys(p).length ? p : undefined, general: undefined }; }); }}
+                    placeholder="+1 555 123 4567"
+                    className={`flex-1 px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent ${errors.phones?.[i] ? "border-red-400" : "border-gray-200"}`}
+                  />
+                  {phones.length > 1 && (
+                    <button type="button" onClick={() => removeField(i, setPhones)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
+                  )}
+                </div>
+                {errors.phones?.[i] && <p className="text-xs text-red-500 mt-1">{errors.phones[i]}</p>}
               </div>
             ))}
             <button type="button" onClick={() => addField(setPhones)} className="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add phone</button>
@@ -129,16 +199,19 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Addresses</label>
             {emails.map((email, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <input
-                  value={email}
-                  onChange={(e) => updateField(i, e.target.value, setEmails)}
-                  placeholder="john@example.com"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
-                />
-                {emails.length > 1 && (
-                  <button type="button" onClick={() => removeField(i, setEmails)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
-                )}
+              <div key={i} className="mb-2">
+                <div className="flex gap-2">
+                  <input
+                    value={email}
+                    onChange={(e) => { updateField(i, e.target.value, setEmails); setErrors((prev) => { const em = { ...prev.emails }; delete em[i]; return { ...prev, emails: Object.keys(em).length ? em : undefined, general: undefined }; }); }}
+                    placeholder="john@example.com"
+                    className={`flex-1 px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent ${errors.emails?.[i] ? "border-red-400" : "border-gray-200"}`}
+                  />
+                  {emails.length > 1 && (
+                    <button type="button" onClick={() => removeField(i, setEmails)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
+                  )}
+                </div>
+                {errors.emails?.[i] && <p className="text-xs text-red-500 mt-1">{errors.emails[i]}</p>}
               </div>
             ))}
             <button type="button" onClick={() => addField(setEmails)} className="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add email</button>
