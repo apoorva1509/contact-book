@@ -60,21 +60,56 @@ This document describes the architectural changes needed to deploy the Contact B
 ### Current State
 No authentication - single-user local application.
 
-### Production Design
+### Production Design — Two Approaches
+
+#### Option A: Clerk (Recommended for MVP / Startup Context)
+
+**Why Clerk:** Managed authentication eliminates the need to build, maintain, and audit auth infrastructure. Clerk provides OAuth providers, session management, RBAC, and compliance features out of the box — letting the team focus on core product.
+
+**Implementation:**
+- **Frontend:** `@clerk/nextjs` — wraps the Next.js app with `<ClerkProvider>`, handles sign-in/sign-up UI, session tokens
+- **Backend:** `clerk-sdk-python` — FastAPI middleware validates Clerk session JWTs, extracts user identity and role from token claims
+- **OAuth providers:** Google, GitHub, Microsoft (configurable in Clerk dashboard, zero backend code)
+- **Role-based access:** Clerk Organizations with custom roles (see RBAC section below)
+
+**Advantages:** SOC 2 compliant out of the box, MFA support, user management dashboard, webhook events for audit logging, no password storage liability.
+
+**Trade-off:** Vendor dependency, per-MAU pricing at scale, less control over auth flows.
+
+#### Option B: Self-Hosted OAuth2 + JWT (Full Control)
+
+For teams needing full control over the auth stack or operating under strict data residency requirements.
 
 **JWT + OAuth2 flow:**
-- Users authenticate via OAuth2 providers (Google, GitHub) or email/password
+- Users authenticate via Google OAuth2 (primary) or email/password fallback
 - Server issues short-lived JWT access tokens (15 min) and long-lived refresh tokens (7 days)
 - Refresh tokens stored in HttpOnly cookies; access tokens in memory
 - Each API request includes `Authorization: Bearer <token>` header
 
 **Implementation:**
-- FastAPI middleware validates JWT on every request
+- Google OAuth2 via `authlib` — handles the `/auth/google/callback` redirect flow
+- FastAPI middleware validates JWT on every request (`python-jose`)
 - User model with `id`, `email`, `password_hash`, `oauth_provider`, `oauth_id`
-- Role-based access: `admin` (manage all users), `user` (manage own contacts)
-- Rate limiting per user identity, not just IP
+- Password hashing via `passlib` with bcrypt for email/password fallback
 
-**Libraries:** `python-jose` for JWT, `passlib` for password hashing, `authlib` for OAuth2
+**Libraries:** `python-jose`, `passlib`, `authlib`
+
+**Trade-off:** Full control and no vendor costs, but requires maintaining auth code, handling token rotation, MFA implementation, and security audits.
+
+### Role-Based Access Control (RBAC)
+
+Three roles scoped to an organization/practice:
+
+| Role | Permissions |
+|------|------------|
+| **Admin** | Full CRUD, merge contacts, manage staff, view audit logs, import/export data, configure settings |
+| **Staff** | Create, read, update contacts. Cannot delete, merge, or access audit logs |
+| **Viewer** | Read-only access to contacts. Cannot create, edit, or delete. Useful for compliance officers or external auditors |
+
+**Enforcement:**
+- Role stored in JWT claims (Clerk: custom organization roles; self-hosted: `role` column on `users` table)
+- FastAPI dependency `require_role("admin")` checks role before executing route handler
+- Frontend conditionally renders action buttons (delete, merge, import) based on user role
 
 ## 2. Multi-Tenancy
 
