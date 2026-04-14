@@ -1,6 +1,8 @@
+import os
+import uuid as uuid_mod
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -119,6 +121,69 @@ async def delete(contact_id: UUID, db: AsyncSession = Depends(get_db)):
     deleted = await delete_contact(db, contact_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Contact not found")
+
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@router.post("/{contact_id}/avatar", response_model=ContactResponse)
+async def upload_avatar(
+    contact_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    contact = await get_contact(db, contact_id)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=422, detail=f"File type {ext} not allowed. Use: {', '.join(ALLOWED_EXTENSIONS)}")
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=422, detail="File too large. Max 5MB.")
+
+    filename = f"{uuid_mod.uuid4()}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    # Delete old avatar file if exists
+    if contact.avatar_url:
+        old_filename = contact.avatar_url.split("/")[-1]
+        old_path = os.path.join(UPLOAD_DIR, old_filename)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    contact.avatar_url = f"/uploads/{filename}"
+    from datetime import datetime
+    contact.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(contact)
+    return contact
+
+
+@router.delete("/{contact_id}/avatar", response_model=ContactResponse)
+async def delete_avatar(contact_id: UUID, db: AsyncSession = Depends(get_db)):
+    contact = await get_contact(db, contact_id)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if contact.avatar_url:
+        old_filename = contact.avatar_url.split("/")[-1]
+        old_path = os.path.join(UPLOAD_DIR, old_filename)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+        contact.avatar_url = None
+        from datetime import datetime
+        contact.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(contact)
+    return contact
 
 
 @router.post("/merge", response_model=ContactResponse)

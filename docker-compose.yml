@@ -23,6 +23,8 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/contactbook
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,3 +40,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

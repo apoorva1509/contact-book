@@ -129,6 +129,15 @@ export default function Home() {
         <ContactModal
           contact={editingContact === "new" ? null : editingContact}
           onSave={handleSave}
+          onAvatarUpload={async (contactId, file) => {
+            try {
+              await api.uploadAvatar(contactId, file);
+              toast.success("Photo updated");
+              refreshAll();
+            } catch {
+              toast.error("Failed to upload photo");
+            }
+          }}
           onClose={() => setEditingContact(null)}
         />
       )}

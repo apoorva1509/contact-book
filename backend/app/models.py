@@ -15,6 +15,7 @@ class Contact(Base):
     last_name = Column(String(100), nullable=True)
     phone_numbers = Column(ARRAY(String), default=list)
     email_addresses = Column(ARRAY(String), default=list)
+    avatar_url = Column(String(500), nullable=True)
     merged_from = Column(ARRAY(UUID(as_uuid=True)), default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

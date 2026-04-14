@@ -24,6 +24,7 @@ class ContactResponse(BaseModel):
     last_name: str | None
     phone_numbers: list[str]
     email_addresses: list[str]
+    avatar_url: str | None
     merged_from: list[UUID]
     created_at: datetime
     updated_at: datetime

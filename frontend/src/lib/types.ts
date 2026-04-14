@@ -4,6 +4,7 @@ export interface Contact {
   last_name: string | null;
   phone_numbers: string[];
   email_addresses: string[];
+  avatar_url: string | null;
   merged_from: string[];
   created_at: string;
   updated_at: string;

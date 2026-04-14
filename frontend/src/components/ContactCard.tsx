@@ -31,6 +31,17 @@ export default function ContactCard({
             onChange={() => onSelect(contact.id)}
             className="mt-1 h-4 w-4 accent-blue-600"
           />
+          {contact.avatar_url ? (
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${contact.avatar_url}`}
+              alt={fullName}
+              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold flex-shrink-0">
+              {contact.first_name[0]}{contact.last_name?.[0] ?? ""}
+            </div>
+          )}
           <div>
             <h3 className="font-semibold text-lg">{fullName}</h3>
             {contact.phone_numbers.map((p) => (

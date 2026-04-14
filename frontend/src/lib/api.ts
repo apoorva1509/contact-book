@@ -46,4 +46,21 @@ export const api = {
     request<Contact>("/api/contacts/merge", { method: "POST", body: JSON.stringify(data) }),
 
   getStats: () => request<Stats>("/api/contacts/stats"),
+
+  uploadAvatar: async (contactId: string, file: File): Promise<Contact> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/contacts/${contactId}/avatar`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new Error(typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail));
+    }
+    return res.json();
+  },
+
+  deleteAvatar: (contactId: string) =>
+    request<Contact>(`/api/contacts/${contactId}/avatar`, { method: "DELETE" }),
 };

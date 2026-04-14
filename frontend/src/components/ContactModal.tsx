@@ -6,10 +6,11 @@ import type { Contact, ContactCreate, ContactUpdate } from "@/lib/types";
 interface ContactModalProps {
   contact: Contact | null;
   onSave: (data: ContactCreate | ContactUpdate) => void;
+  onAvatarUpload?: (contactId: string, file: File) => void;
   onClose: () => void;
 }
 
-export default function ContactModal({ contact, onSave, onClose }: ContactModalProps) {
+export default function ContactModal({ contact, onSave, onAvatarUpload, onClose }: ContactModalProps) {
   const [firstName, setFirstName] = useState(contact?.first_name ?? "");
   const [lastName, setLastName] = useState(contact?.last_name ?? "");
   const [phones, setPhones] = useState<string[]>(contact?.phone_numbers ?? [""]);
@@ -60,6 +61,33 @@ export default function ContactModal({ contact, onSave, onClose }: ContactModalP
           {contact ? "Edit Contact" : "Add Contact"}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {contact && (
+            <div className="flex items-center gap-4">
+              {contact.avatar_url ? (
+                <img
+                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${contact.avatar_url}`}
+                  alt="Avatar"
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-semibold">
+                  {contact.first_name[0]}{contact.last_name?.[0] ?? ""}
+                </div>
+              )}
+              <label className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+                Change photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onAvatarUpload) onAvatarUpload(contact.id, file);
+                  }}
+                />
+              </label>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
             <input
