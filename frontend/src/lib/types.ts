@@ -5,6 +5,7 @@ export interface Contact {
   phone_numbers: string[];
   email_addresses: string[];
   avatar_url: string | null;
+  notes: string | null;
   merged_from: string[];
   created_at: string;
   updated_at: string;
@@ -22,6 +23,7 @@ export interface ContactCreate {
   last_name?: string;
   phone_numbers: string[];
   email_addresses: string[];
+  notes?: string;
 }
 
 export interface ContactUpdate {
@@ -29,6 +31,7 @@ export interface ContactUpdate {
   last_name?: string;
   phone_numbers?: string[];
   email_addresses?: string[];
+  notes?: string;
 }
 
 export interface MergeRequest {

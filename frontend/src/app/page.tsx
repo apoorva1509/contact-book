@@ -113,7 +113,7 @@ export default function Home() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Contact Book</h1>
+      <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-blue-700 via-purple-600 to-blue-500 bg-clip-text text-transparent">Contact Book</h1>
       <StatsBar stats={stats} onDuplicatesClick={() => setShowDuplicates(true)} />
       <SearchBar onSearch={handleSearch} onAdd={() => setEditingContact("new")} />
       <ContactList

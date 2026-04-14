@@ -61,6 +61,7 @@ async def create_contact(session: AsyncSession, data: ContactCreate) -> Contact:
         last_name=data.last_name,
         phone_numbers=phones,
         email_addresses=emails,
+        notes=data.notes,
     )
     session.add(contact)
     await session.commit()
@@ -108,6 +109,8 @@ async def update_contact(
         contact.first_name = data.first_name
     if data.last_name is not None:
         contact.last_name = data.last_name
+    if data.notes is not None:
+        contact.notes = data.notes
 
     contact.updated_at = datetime.utcnow()
     await session.commit()
@@ -137,7 +140,10 @@ async def search_contacts(session: AsyncSession, query: str) -> list[Contact]:
             normalized = normalize_phone(q, "US")
             stmt = select(Contact).where(Contact.phone_numbers.any(normalized))
         except InvalidPhoneError:
-            return []
+            digits = q.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+            stmt = select(Contact).where(
+                text("EXISTS (SELECT 1 FROM unnest(phone_numbers) AS p WHERE p LIKE :pattern)")
+            ).params(pattern=f"%{digits}%")
     else:
         stmt = (
             select(Contact)
@@ -233,6 +239,16 @@ async def merge_contacts(session: AsyncSession, merge_req: MergeRequest) -> Cont
 
     all_emails = list(dict.fromkeys((primary.email_addresses or []) + (secondary.email_addresses or [])))
     primary.email_addresses = all_emails
+
+    # Avatar: keep primary's, fall back to secondary's
+    if not primary.avatar_url and secondary.avatar_url:
+        primary.avatar_url = secondary.avatar_url
+
+    # Notes: concatenate both if both exist
+    if primary.notes and secondary.notes:
+        primary.notes = f"{primary.notes}\n---\n{secondary.notes}"
+    elif secondary.notes:
+        primary.notes = secondary.notes
 
     merged_from = list(primary.merged_from or [])
     merged_from.append(secondary.id)

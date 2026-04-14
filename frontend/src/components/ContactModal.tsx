@@ -10,11 +10,14 @@ interface ContactModalProps {
   onClose: () => void;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function ContactModal({ contact, onSave, onAvatarUpload, onClose }: ContactModalProps) {
   const [firstName, setFirstName] = useState(contact?.first_name ?? "");
   const [lastName, setLastName] = useState(contact?.last_name ?? "");
   const [phones, setPhones] = useState<string[]>(contact?.phone_numbers ?? [""]);
   const [emails, setEmails] = useState<string[]>(contact?.email_addresses ?? [""]);
+  const [notes, setNotes] = useState(contact?.notes ?? "");
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -30,7 +33,8 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
       first_name: firstName,
       last_name: lastName || undefined,
       phone_numbers: phones.filter((p) => p.trim()),
-      email_addresses: emails.filter((e) => e.trim()),
+      email_addresses: emails.filter((em) => em.trim()),
+      notes: notes.trim() || undefined,
     };
     onSave(data);
   };
@@ -55,8 +59,8 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">
           {contact ? "Edit Contact" : "Add Contact"}
         </h2>
@@ -65,16 +69,16 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
             <div className="flex items-center gap-4">
               {contact.avatar_url ? (
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${contact.avatar_url}`}
+                  src={`${API_BASE}${contact.avatar_url}`}
                   alt="Avatar"
-                  className="w-16 h-16 rounded-full object-cover"
+                  className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-100"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-semibold">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white flex items-center justify-center text-xl font-semibold">
                   {contact.first_name[0]}{contact.last_name?.[0] ?? ""}
                 </div>
               )}
-              <label className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+              <label className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
                 Change photo
                 <input
                   type="file"
@@ -94,7 +98,7 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
             />
           </div>
           <div>
@@ -102,7 +106,7 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
             <input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
             />
           </div>
           <div>
@@ -113,14 +117,14 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
                   value={phone}
                   onChange={(e) => updateField(i, e.target.value, setPhones)}
                   placeholder="+1 555 123 4567"
-                  className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
                 />
                 {phones.length > 1 && (
-                  <button type="button" onClick={() => removeField(i, setPhones)} className="text-red-500 hover:text-red-700 px-2">x</button>
+                  <button type="button" onClick={() => removeField(i, setPhones)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => addField(setPhones)} className="text-sm text-blue-600 hover:text-blue-800">+ Add phone</button>
+            <button type="button" onClick={() => addField(setPhones)} className="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add phone</button>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Addresses</label>
@@ -130,18 +134,30 @@ export default function ContactModal({ contact, onSave, onAvatarUpload, onClose 
                   value={email}
                   onChange={(e) => updateField(i, e.target.value, setEmails)}
                   placeholder="john@example.com"
-                  className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent"
                 />
                 {emails.length > 1 && (
-                  <button type="button" onClick={() => removeField(i, setEmails)} className="text-red-500 hover:text-red-700 px-2">x</button>
+                  <button type="button" onClick={() => removeField(i, setEmails)} className="text-red-400 hover:text-red-600 px-2 transition">x</button>
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => addField(setEmails)} className="text-sm text-blue-600 hover:text-blue-800">+ Add email</button>
+            <button type="button" onClick={() => addField(setEmails)} className="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add email</button>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Personal Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add a personal note about this contact..."
+              rows={3}
+              maxLength={2000}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none focus:border-transparent resize-none"
+            />
+            <p className="text-xs text-gray-400 text-right mt-0.5">{notes.length}/2000</p>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">{contact ? "Update" : "Create"}</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition">Cancel</button>
+            <button type="submit" className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 transition-all font-medium">{contact ? "Update" : "Create"}</button>
           </div>
         </form>
       </div>

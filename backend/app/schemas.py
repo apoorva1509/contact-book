@@ -9,6 +9,7 @@ class ContactCreate(BaseModel):
     last_name: str | None = Field(None, max_length=100)
     phone_numbers: list[str] = Field(default_factory=list)
     email_addresses: list[str] = Field(default_factory=list)
+    notes: str | None = Field(None, max_length=2000)
 
 
 class ContactUpdate(BaseModel):
@@ -16,6 +17,7 @@ class ContactUpdate(BaseModel):
     last_name: str | None = Field(None, max_length=100)
     phone_numbers: list[str] | None = None
     email_addresses: list[str] | None = None
+    notes: str | None = None
 
 
 class ContactResponse(BaseModel):
@@ -25,6 +27,7 @@ class ContactResponse(BaseModel):
     phone_numbers: list[str]
     email_addresses: list[str]
     avatar_url: str | None
+    notes: str | None
     merged_from: list[UUID]
     created_at: datetime
     updated_at: datetime
